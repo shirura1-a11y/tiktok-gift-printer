@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
+import { networkInterfaces } from 'node:os';
 
 const files={'/':['index.html','text/html; charset=utf-8'],'/index.html':['index.html','text/html; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/script.js':['script.js','text/javascript; charset=utf-8'],'/bridge.js':['bridge.js','text/javascript; charset=utf-8']};
 const demoAvatar='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#e5d4ad"/><path d="M21 42L23 13L41 29M59 29L78 13L80 43" fill="#8c927b"/><ellipse cx="50" cy="51" rx="32" ry="29" fill="#fff5db"/><circle cx="39" cy="48" r="3" fill="#475540"/><circle cx="61" cy="48" r="3" fill="#475540"/><path d="M44 63Q50 69 56 63" fill="none" stroke="#ba8a72" stroke-width="2"/><path d="M20 100Q20 78 50 78Q80 78 80 100" fill="#788d72"/></svg>';
@@ -16,7 +17,8 @@ export function createPrintServer({root,jobs,port=8787,mode='live',username,onDe
   const server=createServer(async(req,res)=>{
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','no-store');
     const json=(code,data)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));};
-    const allowedHosts=[`127.0.0.1:${actualPort}`,`localhost:${actualPort}`];
+    const lanAddresses=Object.values(networkInterfaces()).flat().filter(i=>i&&i.family==='IPv4'&&!i.internal).map(i=>i.address);
+    const allowedHosts=[`127.0.0.1:${actualPort}`,`localhost:${actualPort}`,...lanAddresses.map(ip=>`${ip}:${actualPort}`)];
     if(!allowedHosts.includes(req.headers.host)){json(403,{error:'ローカルの正規URLから開いてください'});return;}
     if(req.headers.origin&&!allowedHosts.some(h=>req.headers.origin==='http://'+h)){json(403,{error:'他のサイトからの操作は受け付けません'});return;}
     try{const path=new URL(req.url,'http://127.0.0.1').pathname;
@@ -44,7 +46,7 @@ export function createPrintServer({root,jobs,port=8787,mode='live',username,onDe
   });
   const heartbeat=setInterval(()=>{for(const c of clients.values())if(!c.res.destroyed)c.res.write(': heartbeat\n\n');},15000);heartbeat.unref();
   return {deliver,report,setStatus(patch){status={...status,...patch};report();},get status(){return report();},
-    async listen(){await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});actualPort=server.address().port;return `http://127.0.0.1:${actualPort}`;},
+    async listen(){await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'0.0.0.0',resolve);});actualPort=server.address().port;return `http://127.0.0.1:${actualPort}`;},
     async close(){clearInterval(heartbeat);for(const c of clients.values())c.res.destroy();clients.clear();primary='';if(server.listening)await new Promise((resolve,reject)=>server.close(e=>e?reject(e):resolve()));}
   };
 }
