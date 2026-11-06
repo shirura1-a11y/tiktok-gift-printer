@@ -1,6 +1,6 @@
 # Gift Atelier — 縦型ギフト連動アイコンプリンター
 
-HTML / CSS / JavaScript / Canvasのみで動作する、外部依存なしのローカルデモです。TikTok連携・OBS設定・3D・外部APIは含みません。
+配信画面はHTML / CSS / JavaScript / Canvasのみのローカルデモです。別プロセスのNode.jsでTikTok LIVEのギフト受信ログを確認できます。既存の9:16画面・印刷コードは変更せず、受信イベントから印刷への自動連動・OBS設定はまだ実装していません。
 
 ## 起動
 
@@ -69,7 +69,7 @@ enqueuePrint({ name: '画像エラー', avatar: 'data:image/png;base64,broken' }
 getPrintState();
 ```
 
-username / avatarUrl はname / avatarの同義フィールド。ユーザーとギフト種類は受付時にコピーします。画像エラー・3.5秒のタイムアウトでは代替アイコンで継続し、後続が追い越さないように処理します。サンプル3種類は埋め込みSVGで、外部通信を行いません。オフライン利用ではdata URLまたはローカル画像を指定してください。
+username / avatarUrl はname / avatarの同義フィールド。ユーザーとギフト種類は受付時にコピーします。画像エラー・3.5秒のタイムアウトでは代替アイコンで継続し、後続が追い越さないように処理します。配信画面のサンプル3種類は埋め込みSVGで、配信画面自体は外部通信を行いません。オフライン利用ではdata URLまたはローカル画像を指定してください。
 
 getPrintState() は printing、loading、waiting、completed、retained、exhibited、galleryNames、galleryMoving、storageOK、animating、currentGift、photoGifts、layout を返します。プログラムから印刷を追加しただけでは、ブラウザの音声制限により操作前には無音の場合があります。
 
@@ -92,3 +92,89 @@ JavaScript構文チェック、Canvas/DOM/localStorageモックによる次の�
 ブラウザ操作用cua_repl.jsが利用できないため、実ブラウザの外観・音声・スクロール実測は未検証です。Windows 10 / RAM 4GB実機でのCPU使用率とフレームレートも未計測で、30fpsは設計目標です。
 
 変更は非公開GitHubリポジトリのmainに、接続済みGitHubアプリを使って保存しています。
+
+## TikTok LIVEギフト受信ログ（Node.js）
+
+接続先の初期値は **user52107817831310** です。公開LIVEを開始してから起動します。ログは **PowerShell／コマンドプロンプト** に表示し、ブラウザ画面・印刷・黄金額縁には送りません。元のindex.html、style.css、script.jsは変更していません。
+
+### Windows 10で起動
+
+1. [Node.js公式サイト](https://nodejs.org/)から **Node.js 24 LTS（64bit）** をインストールしてください。本プロジェクトはNode.js 24以上を対象とします。インストール後にPowerShellを開き直します。
+2. GitHubからZIPをダウンロードして展開し、PowerShellでプロジェクトのフォルダーを開きます。
+3. 以下を実行します。パスは実際の展開先に置き換えてください。
+
+```powershell
+cd "$HOME\Downloads\tiktok-gift-printer-main"
+node --version
+npm --version
+npm ci
+npm start
+```
+
+`npm ci` は初回または依存更新時だけ必要です。package-lock.jsonとtiktok-live-connector 2.5.0で依存を固定しています。初回インストールと実LIVE受信にはインターネット接続が必要です。
+
+接続できると `[CONNECTED] @user52107817831310 / roomId=...` が表示されます。実際にギフトが届くと `[GIFT]` が表示されます。終了は **Ctrl+C**。9:16画面は従来どおりindex.htmlをブラウザで別に開いて使えます。
+
+PowerShellの実行ポリシーで npm.ps1 が拒否された場合は、ポリシーを変更せず以下を使用できます。
+
+```powershell
+npm.cmd ci
+npm.cmd start
+```
+
+接続先を一時的に変更する場合は `npm start -- 別のユーザー名`。引数がなければ環境変数TIKTOK_USERNAME、未設定なら既定のuser52107817831310を使用します。@付きも受け付けます。プロフィールURLや日本語の表示名ではなく、URLの@以降のユーザー名を指定してください。.envファイルは自動読み込みしません。
+
+### 受信ログの形式
+
+以下は説明用の例です。
+
+```text
+[CONNECTING] @user52107817831310 — ギフト受信ログのみ。印刷への自動連動なし。
+[CONNECTED] @user52107817831310 / roomId=123...
+[GIFT] {"receivedAt":"...","roomId":"...","messageId":"...","groupId":"...","senderId":"...","senderName":"視聴者さん","senderUniqueId":"viewer01","recipientId":"...","avatarUrl":"https://...","giftId":"5655","giftName":"バラ","repeatCount":3,"giftType":1,"repeatEnd":true}
+```
+
+- senderName: 送信者の表示名。なければユーザー名、さらに欠けていれば「名前不明」。
+- avatarUrl: 送信者のプロフィール画像URL。欠けている場合は空文字。画像はダウンロードしません。
+- giftName: ギフト名。通知内情報→拡張情報の順に取得し、欠けていればID付きの不明表示。
+- repeatCount: 確定した数量。連続送信の累積値なので、途中経過を加算してはいけません。
+- IDは文字列として保持し、大きな数値IDを丸めません。
+
+### 連続送信・二重計上の防止
+
+- ギフト種別1の連続送信はrepeatEndが1/trueになった時だけ確定。1→2→3→終了3なら、確定ログは数量3の1行です。
+- 同じmessageIdの再配送を除外。終了通知のmessageIdが変わっても、ルーム・送信者・受信者・ギフト・groupIdの組が同じなら二重に確定しません。
+- groupIdが異なる次の連続送信、別の送信者、別のギフトは別件です。通常ギフトもmessageIdが異なる別件をまとめません。
+- 過去履歴の初期バッチ処理を無効にし、接続時の履歴再計上を避けます。
+- 種別や識別IDが欠けて安全に確定できない通知は `[GIFT_UNCONFIRMED]` とcounted:false付きで表示。確定分を利用する場合は `[GIFT]` 行だけを対象にしてください。
+- 重複除外キャッシュはプロセス内に30分・最大10,000キーを保持。再起動・期限切れ・上限到達後の非常に古い再配送まで、完全な一度だけの処理を保証するものではありません。最終通知が届かなかった連続送信は勝手に確定しません。
+
+### 接続失敗時
+
+原因・確認手順・コネクターのエラー詳細を `[ERROR]` に表示し、終了コード1で停止します。取得経路ごとの内部例外も表示しますが、認証情報や署名URLのクエリーはログから除きます。失敗を成功扱いにしたり、模擬データに自動で切り替えたりしません。
+
+| 表示 | 確認事項 |
+| --- | --- |
+| UserOffline / 配信オフライン判定 | LIVEを開始し、対象ページをブラウザで視聴できるか確認して再実行 |
+| ルーム情報・Room ID取得失敗 | ユーザー名、配信開始状態、地域・通信制限。これだけでオフラインとは断定しない |
+| ECONNREFUSED / ENOTFOUND / timeout / TLS | インターネット、DNS、Windowsファイアウォール、プロキシ、PC日時 |
+| 401 / 403 / アクセス拒否 | 公開LIVEの視聴可否、TikTokまたは署名サービス側の制限 |
+| 429 / RateLimit | 時間を置いて再実行。即時再接続を繰り返さない |
+| ERR_MODULE_NOT_FOUND | プロジェクトフォルダーで npm ci を実行 |
+
+接続試行が60秒を超えるとタイムアウト終了します。LIVE終了時は `[STREAM_END]`、切断時は `[DISCONNECTED]` を表示します。自動再接続は行わず、配信再開・通信回復後にnpm startを再実行します。
+
+tiktok-live-connectorは非公式のコネクターです。公開LIVEの読み取りとして接続し、アカウントへのログイン、コメント送信、ギフト送信は実装していません。接続署名にはライブラリ既定の外部署名サービスが使われるため、TikTok側の仕様変更やサービスの利用制限で接続できない場合があります。詳しくは[コネクター公式README](https://github.com/zerodytrash/TikTok-Live-Connector)と[ギフト連続送信の公式ガイド](https://ttlc.docs.isaackogan.com/guides/gifts/)を参照してください。
+
+### LIVEなしのテスト
+
+```powershell
+npm run demo
+npm test
+```
+
+デモは実LIVEに接続せず、模擬の送信者名・画像URL・ギフトを流します。画像URLはダミーです。途中経過と重複通知を流しても `[GIFT]` は3行、数量は3+2+1=6になります。npm testはNode.js標準テストランナーで13項目を検証します。
+
+追加ファイル: package.json、package-lock.json、.gitignore、live/index.mjs、live/receiver.mjs、live/gifts.mjs、live/errors.mjs、live/demo.mjs、test/live.test.mjs。
+
+検証環境: Linux / Node.js v24.22.1。npm install・パッケージの実インポート・デモ・13テストは成功しました。指定アカウントへの実接続では、Room ID取得経路がECONNREFUSED（接続拒否）となり、LIVE接続と実ギフト受信には成功していません。対象がオフラインかどうかは、この結果だけでは判定できません。Windows 10実機での起動と実際のギフト受信は未確認です。
