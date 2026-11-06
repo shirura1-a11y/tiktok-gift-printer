@@ -31,7 +31,7 @@ else{
     const url=await app.listen();console.log(`[LOCAL] ${url}\n配信画面をこのURLで1タブ開いてください。モード: ${demo?'デモ（実LIVE接続なし）':'LIVE自動印刷'}`);
     controller=createLiveController({username,onGift:accept,onStatus:s=>app.setStatus(s),createConnection:async()=>{
       if(demo){mock=new EventEmitter();mock.connect=async()=>{mock.emit('connected',{roomId:'demo-room'});return {roomId:'demo-room'};};mock.disconnect=async()=>mock.emit('disconnected');return mock;}
-      const {TikTokLiveConnection}=await import('tiktok-live-connector');return new TikTokLiveConnection(username,{processInitialData:false,fetchRoomInfoOnConnect:true,enableExtendedGiftInfo:true,webClientOptions:{timeout:{request:15000},retry:{limit:0}},wsClientOptions:{handshakeTimeout:15000}});
+      const {TikTokLiveConnection}=await import('tiktok-live-connector');return new TikTokLiveConnection(username,{processInitialData:false,fetchRoomInfoOnConnect:true,enableExtendedGiftInfo:false,webClientOptions:{timeout:{request:15000},retry:{limit:0}},wsClientOptions:{handshakeTimeout:15000}});
     }});
     controller.start();let stopping=false;
     async function shutdown(){if(stopping)return;stopping=true;console.log('\n[STOP] 停止します。未完了の印刷待ちは保存済みです。');const forced=setTimeout(()=>process.exit(0),3000);await controller.stop();await app.close();clearTimeout(forced);process.exit(0);}
