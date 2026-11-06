@@ -1,15 +1,16 @@
 {
   "name": "tiktok-gift-printer",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Local 9:16 gift printer with a read-only TikTok LIVE gift logger",
+  "description": "9:16 gift printer with TikTok LIVE automatic printing and durable local queue",
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
     "start": "node live/index.mjs",
     "demo": "node live/index.mjs --demo",
-    "test": "node --test --test-isolation=none test/*.test.mjs"
+    "test": "node --test --test-isolation=none test/*.test.mjs",
+    "demo:logs": "node live/index.mjs --demo-logs"
   },
   "dependencies": {
     "tiktok-live-connector": "2.5.0"

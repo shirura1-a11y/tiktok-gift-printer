@@ -14,6 +14,7 @@ export function explainError(error){
   const detail=parts.filter(Boolean).join(' / ')||'詳細情報なし';
   let cause='接続処理に失敗しました。',action='下のエラー詳細を確認してください。TikTok側の仕様変更や署名サービス障害の場合もあります。';
   if(/UserOffline|isn.t (?:online|live)|not (?:currently )?(?:live|online)|offline/i.test(detail)){cause='コネクターが配信オフラインと判定しました。';action='対象アカウントでLIVEを開始し、ブラウザでも視聴できることを確認してから再実行してください。';}
+  else if(/EADDRINUSE/i.test(detail)){cause='ローカルサーバーのポートが使用中です。';action='起動済みのNode.jsを終了するか、live/config.json のportを変更してください。';}
   else if(/ERR_MODULE_NOT_FOUND|Cannot find package/i.test(detail)){cause='必要なNode.jsパッケージが見つかりません。';action='リポジトリのフォルダーで npm ci を実行してください。';}
   else if(/InvalidUniqueId|INVALID_USERNAME/i.test(detail)){cause='接続先ユーザー名の形式が不正です。';action='@の後ろのユーザー名を指定してください。表示名やプロフィールURLは指定しません。';}
   else if(/429|RateLimit|rate.?limit/i.test(detail)){cause='TikTokまたは署名サービスの接続回数制限です。';action='しばらく待って再実行してください。繰り返しの即時再接続は行いません。';}

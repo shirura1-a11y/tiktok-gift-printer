@@ -1,0 +1,9 @@
+{
+  "username": "user52107817831310",
+  "port": 8787,
+  "gifts": {
+    "rose": { "ids": ["5655"], "names": ["バラ", "Rose"] },
+    "roza": { "ids": [], "names": ["ローザ", "Rosa"] },
+    "eternal": { "ids": [], "names": ["永遠のローザ", "Eternal Rosa", "Forever Rosa"] }
+  }
+}
